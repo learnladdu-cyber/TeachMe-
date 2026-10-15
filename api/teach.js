@@ -16,10 +16,16 @@ function jsonResponse(body, status = 200) {
 function validate(input) {
   if (!input || typeof input !== 'object') return 'Request body must be an object.';
   if (!input.topic || typeof input.topic !== 'string' || input.topic.trim().length > 120) return 'Add a topic up to 120 characters.';
-  if (!input.level || typeof input.level !== 'string') return 'Choose a student level.';
+  if (!['Age 10', 'High school', 'Beginner adult'].includes(input.level)) return 'Choose a supported student level.';
   if (!input.message || typeof input.message !== 'string' || input.message.trim().length < 2) return 'Write a little more so the student can respond.';
   if (input.message.length > 5000) return 'Keep each explanation under 5,000 characters.';
   return null;
+}
+
+function normalizeContext(input) {
+  const prior = Number(input.prior_score);
+  const gaps = Array.isArray(input.gaps) ? input.gaps.filter(gap => typeof gap === 'string').map(gap => gap.trim().slice(0, 160)).filter(Boolean).slice(0, 6) : [];
+  return { prior_score: Number.isFinite(prior) ? Math.max(0, Math.min(100, Math.round(prior))) : 50, gaps };
 }
 
 function fallback(input) {
@@ -42,19 +48,24 @@ async function teach(input) {
   if (!process.env.LLM_API_KEY) return jsonResponse(fallback(input));
 
   const base = (process.env.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  const context = normalizeContext(input);
   const response = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.LLM_API_KEY}` },
+    signal: controller.signal,
     body: JSON.stringify({
       model: process.env.LLM_MODEL || 'gpt-4o-mini',
       temperature: 0.7,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: JSON.stringify({ topic: input.topic, student_level: input.level, prior_score: input.prior_score ?? 50, gaps: input.gaps || [], explanation: input.message }) }
+        { role: 'user', content: JSON.stringify({ topic: input.topic.trim(), student_level: input.level, prior_score: context.prior_score, gaps: context.gaps, explanation: input.message.trim() }) }
       ]
     })
   });
+  clearTimeout(timeout);
   if (!response.ok) throw new Error(`LLM request failed with ${response.status}`);
   const data = await response.json();
   const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
