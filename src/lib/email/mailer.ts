@@ -10,7 +10,33 @@ export type SendMailInput = {
 
 let cached: { key: string; transport: Transporter } | null = null;
 
+const RESEND_KEY = process.env.RESEND_API_KEY?.trim() ?? "";
+
+// Resend delivers over SMTP; when RESEND_API_KEY is present it takes priority
+// over the database-configured SMTP settings so transactional mail (verification,
+// admin sign-in codes) works out of the box on serverless hosts.
+function resendTransport(): { transport: Transporter; from: string } | null {
+  if (!RESEND_KEY) return null;
+  const cacheKey = `resend:${RESEND_KEY.slice(-6)}`;
+  if (!cached || cached.key !== cacheKey) {
+    cached = {
+      key: cacheKey,
+      transport: nodemailer.createTransport({
+        host: "smtp.resend.com",
+        port: 465,
+        secure: true,
+        auth: { user: "resend", pass: RESEND_KEY },
+      }),
+    };
+  }
+  const from = process.env.RESEND_FROM?.trim() || "HelpDeskFlow <onboarding@resend.dev>";
+  return { transport: cached.transport, from };
+}
+
 async function getTransport(): Promise<{ transport: Transporter; from: string } | null> {
+  const resend = resendTransport();
+  if (resend) return resend;
+
   const smtp = await getSmtpSettings();
   if (!smtp.configured) return null;
 
@@ -30,6 +56,7 @@ async function getTransport(): Promise<{ transport: Transporter; from: string } 
 }
 
 export async function mailerConfigured(): Promise<boolean> {
+  if (RESEND_KEY) return true;
   const smtp = await getSmtpSettings();
   return smtp.configured;
 }

@@ -1,4 +1,5 @@
-import { getEmailRules, getSmtpSettings } from "@/lib/integrations/store";
+import { getEmailRules } from "@/lib/integrations/store";
+import { mailerConfigured } from "@/lib/email/mailer";
 
 // A compact, high-signal blocklist. Admin can extend via blocked domains.
 const DISPOSABLE_DOMAINS = new Set([
@@ -44,6 +45,6 @@ export async function checkSignupEmail(email: string): Promise<SignupEmailCheck>
 // Verification is only enforced when an SMTP transport is actually configured,
 // otherwise accounts would be locked out with no way to verify.
 export async function verificationRequired(): Promise<boolean> {
-  const [rules, smtp] = await Promise.all([getEmailRules(), getSmtpSettings()]);
-  return rules.requireVerification && smtp.configured;
+  const [rules, configured] = await Promise.all([getEmailRules(), mailerConfigured()]);
+  return rules.requireVerification && configured;
 }

@@ -51,7 +51,8 @@ export default async function SettingsPage({
   });
   if (!org) notFound();
 
-  const isPlatform = ctx.role === "PLATFORM_ADMIN";
+  const isPlatform = ctx.role === "PLATFORM_ADMIN" || ctx.session.user.isPlatformAdmin;
+  const displayRole = ctx.session.user.isPlatformAdmin ? "PLATFORM_ADMIN" : ctx.role;
   const planFeatures = Array.isArray(org.plan?.features)
     ? (org.plan?.features as unknown as string[])
     : [];
@@ -63,7 +64,7 @@ export default async function SettingsPage({
           <h1>Settings</h1>
           <p className="page-sub">
             Workspace profile, plan and member access · you are{" "}
-            {ctx.role.replace("_", " ").toLowerCase()}
+            {displayRole.replace("_", " ").toLowerCase()}
           </p>
         </div>
       </div>

@@ -64,7 +64,10 @@ export default async function WorkspacePage({
         <div>
           <h1>Unified inbox</h1>
           <p className="page-sub">
-            {orgName} · signed in as {ctx.role.replace("_", " ").toLowerCase()}
+            {orgName} · signed in as{" "}
+            {(ctx.session.user.isPlatformAdmin ? "PLATFORM_ADMIN" : ctx.role)
+              .replace("_", " ")
+              .toLowerCase()}
           </p>
         </div>
         <form className="row" action="/app" method="get" style={{ gap: 8 }}>

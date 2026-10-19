@@ -15,8 +15,11 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   const membership = activeId
     ? session.memberships.find((m) => m.organizationId === activeId)
     : undefined;
-  const role = (membership?.role ??
-    (session.user.isPlatformAdmin ? "PLATFORM_ADMIN" : null)) as Role | null;
+  // Platform admins always present as such, even when they also hold a
+  // membership in the active organization.
+  const role = (session.user.isPlatformAdmin
+    ? "PLATFORM_ADMIN"
+    : membership?.role ?? null) as Role | null;
 
   if (!role) redirect("/login");
   if (role === "CUSTOMER") redirect("/portal");

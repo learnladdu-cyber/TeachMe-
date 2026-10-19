@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/guard";
 import { listNotifications } from "@/lib/notifications";
-import { Icon } from "@/components/Icon";
+import { Icon, type IconName } from "@/components/Icon";
 import { markAllReadAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const TYPE_ICON = {
+const TYPE_ICON: Record<string, IconName> = {
   TICKET_CREATED: "ticket",
   TICKET_ASSIGNED: "user",
   TICKET_REPLIED: "chat",
@@ -17,7 +17,20 @@ const TYPE_ICON = {
   PAYMENT: "life-buoy",
   MENTION: "chat",
   SYSTEM: "bolt",
-} as const;
+};
+
+const TYPE_TONE: Record<string, string> = {
+  TICKET_CREATED: "brand",
+  TICKET_ASSIGNED: "brand",
+  TICKET_REPLIED: "brand",
+  TICKET_RESOLVED: "green",
+  SLA_BREACH: "rose",
+  CSAT: "gold",
+  INVITE: "brand",
+  PAYMENT: "amber",
+  MENTION: "brand",
+  SYSTEM: "brand",
+};
 
 function timeAgo(date: Date): string {
   const diff = Date.now() - new Date(date).getTime();
@@ -26,7 +39,9 @@ function timeAgo(date: Date): string {
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default async function NotificationsPage() {
@@ -40,7 +55,11 @@ export default async function NotificationsPage() {
         <div>
           <h1>Notifications</h1>
           <p className="page-sub">
-            {unread > 0 ? `${unread} unread` : "You're all caught up"}
+            {items.length === 0
+              ? "Ticket and billing activity will show up here."
+              : unread > 0
+                ? `${unread} unread · ${items.length} total`
+                : `You're all caught up · ${items.length} total`}
           </p>
         </div>
         {unread > 0 && (
@@ -52,37 +71,40 @@ export default async function NotificationsPage() {
         )}
       </div>
 
-      <div className="card flush">
-        {items.length === 0 ? (
-          <p className="muted" style={{ padding: 20 }}>
-            Nothing here yet. Ticket and billing activity will show up here.
-          </p>
-        ) : (
-          <div className="mini-list" style={{ padding: 8 }}>
-            {items.map((n) => (
-              <div className={`mini-row${n.readAt ? "" : " unread"}`} key={n.id}>
-                <div className="cell-user">
-                  <span className="stat-icon">
-                    <Icon name={TYPE_ICON[n.type]} />
-                  </span>
-                  <div>
-                    <div className="mini-title">{n.title}</div>
-                    {n.body && <div className="cell-sub">{n.body}</div>}
-                    <div className="cell-sub">{timeAgo(n.createdAt)}</div>
-                  </div>
-                </div>
-                <div className="row" style={{ gap: 8 }}>
-                  {n.link && (
-                    <Link className="btn secondary sm" href={n.link}>
-                      Open
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
+      {items.length === 0 ? (
+        <div className="empty">
+          <div className="empty-icon">
+            <Icon name="bell" />
           </div>
-        )}
-      </div>
+          <h3>Nothing here yet</h3>
+          <p>When a ticket is assigned, replied to, or a payment is processed, you&apos;ll see it here.</p>
+        </div>
+      ) : (
+        <ul className="notif-list">
+          {items.map((n) => (
+            <li key={n.id} className={`notif-row${n.readAt ? "" : " unread"}`}>
+              <span className={`notif-icon tone-${TYPE_TONE[n.type] ?? "brand"}`}>
+                <Icon name={TYPE_ICON[n.type] ?? "bell"} />
+              </span>
+              <div className="notif-main">
+                <div className="notif-top">
+                  <span className="notif-title">{n.title}</span>
+                  <span className="notif-time">{timeAgo(n.createdAt)}</span>
+                </div>
+                {n.body && <p className="notif-body">{n.body}</p>}
+              </div>
+              <div className="notif-actions">
+                {!n.readAt && <span className="notif-dot" title="Unread" aria-label="Unread" />}
+                {n.link && (
+                  <Link className="btn secondary sm" href={n.link}>
+                    Open
+                  </Link>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

@@ -3451,6 +3451,105 @@ label.inline input {
 .mini-row.unread {
   background: color-mix(in srgb, var(--gold, #c9a24b) 9%, transparent);
 }
+
+/* ---------- Notifications ---------- */
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+}
+.notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+.notif-row:first-child {
+  border-top: none;
+}
+.notif-row.unread {
+  background: color-mix(in srgb, var(--gold, #c9a24b) 8%, transparent);
+}
+.notif-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  flex: none;
+}
+.notif-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.notif-icon.tone-green {
+  background: #dcfce7;
+  color: #15803d;
+}
+.notif-icon.tone-amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+.notif-icon.tone-rose {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.notif-icon.tone-gold {
+  background: var(--gold-soft);
+  color: var(--gold-3);
+  border: 1px solid var(--lux-border);
+}
+.notif-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.notif-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  justify-content: space-between;
+}
+.notif-title {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notif-time {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  flex: none;
+}
+.notif-body {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.notif-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  align-self: center;
+}
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold, #c9a24b);
+  flex: none;
+}
 .star {
   background: none;
   border: none;
