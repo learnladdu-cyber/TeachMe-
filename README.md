@@ -1,77 +1,159 @@
-# TeachMe Back
+# HelpDeskFlow
 
-TeachMe Back is a single-page learning app built around the **Feynman technique**: instead of reading another explanation, you teach a curious AI student. The student asks one question at a time, notices jargon and missing links, and keeps a live confusion meter so you can see whether your explanation is getting clearer.
+A multi-tenant customer-support platform for ticketing, knowledge bases,
+automation, reporting and administration — with a polished agent workspace and
+a branded customer portal.
 
-## Features
+## Stack
 
-- Topic + student level setup: Age 10, High school, or Beginner adult
-- Curious-student chat with one follow-up question per turn
-- Server-side OpenAI-compatible LLM route returning `{ reply, confusion_score, gaps }`
-- Confusion meter, gap list, and end-of-session clarity report
-- Three seeded demo topics for a quick product walkthrough: Photosynthesis, The internet, and Supply and demand
-- Optional browser voice input with the Web Speech API
-- Local browser history (up to 12 sessions)
-- Responsive layout with persisted light/dark mode
-- Runs locally with Node 18+ and deploys to Vercel
+- **Next.js (App Router) + TypeScript** — web UI, server actions and REST API
+  route handlers
+- **PostgreSQL + Prisma** — data model with per-row tenant scoping
+- **Tailwind-free CSS** — a single global stylesheet, accessible and responsive
 
-## Proposed file structure
+## Getting started
 
-```text
-api/teach.js       # Server-only LLM prompt, validation, and JSON response
-public/index.html  # App shell
-public/app.js      # SPA state, chat flow, reports, localStorage
-public/styles.css  # Responsive themeable UI
-server.js          # Local Node server and API adapter
-vercel.json        # Vercel static + serverless routing
-.env.example       # Server-only provider configuration
-```
+1. Install dependencies:
 
-## Run locally
+   ```bash
+   npm install
+   ```
+
+2. Start PostgreSQL (or point `DATABASE_URL` at your own instance):
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. Create `.env` from the template and adjust if needed:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Apply the schema:
+
+   ```bash
+   npm run db:push
+   ```
+
+5. Run the app:
+
+   ```bash
+   npm run dev
+   ```
+
+   Open http://localhost:3000
+
+## Seed data
+
+`npm run db:seed` writes only the real plan catalog (Free, Growth, Business,
+Enterprise). It is idempotent and safe to run against any database — no sample
+organizations, tickets or users are created. Create the first organization
+through the public signup flow at `/register`.
+
+## What works
+
+- **Public site**: marketing home, features and pricing.
+- **Auth**: self-serve signup (creates organization + admin), login, logout,
+  database-backed sessions in HTTP-only cookies, scrypt password hashing.
+- **Multi-tenancy**: `organization_id` on every tenant-owned row; server-side
+  membership checks on every read/write.
+- **Customer portal**: dashboard, create ticket, ticket detail with public
+  replies only, and a profile page for name/locale and password changes.
+- **Agent workspace**: unified inbox with queues/search, ticket workspace with
+  status transitions (enforced by a server-side map), priority, assignment,
+  public replies and internal notes, and an audit event trail.
+- **Customers directory**: everyone in the organization with their request
+  counts and last activity.
+- **Knowledge base**: draft/published articles with categories, slugs and view
+  counts.
+- **Automation**: trigger / condition / action rules with enable/disable and run
+  history.
+- **Reports**: volume, backlog, response and resolution metrics with filters.
+- **Settings**: organization profile, plan and member role/status management
+  (organization admins only), each change written to the audit log.
+- **Platform admin**: tenant overview with cross-tenant metrics and an audit log
+  entry for each access.
+
+## API (v1)
+
+All routes are tenant-scoped and return a consistent envelope:
+`{ data }` or `{ error: { code, message, request_id, field_errors? } }`.
+
+| Method + route | Purpose |
+| --- | --- |
+| `POST /api/auth/register` | Create user + organization + admin membership |
+| `POST /api/auth/login` / `POST /api/auth/logout` | Session lifecycle |
+| `GET /api/me` | Current user, active org and memberships |
+| `GET /api/organizations/:orgId/tickets` | List/search tickets (org-scoped) |
+| `POST /api/organizations/:orgId/tickets` | Create a ticket |
+| `GET /api/organizations/:orgId/tickets/:ticketId` | Read ticket + permitted messages |
+| `PATCH /api/organizations/:orgId/tickets/:ticketId` | Update status/priority/assignment |
+| `POST /api/organizations/:orgId/tickets/:ticketId/messages` | Public reply or internal note |
+| `GET /api/admin/organizations` | Platform admin tenant list (audited) |
+
+## Scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Prisma generate + production build |
+| `npm run start` | Start the production server |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm run db:push` | Apply schema to the database |
+| `npm run db:migrate` | Create/apply a migration |
+| `npm run db:seed` | Write the plan catalog (safe, idempotent) |
+| `npm run db:studio` | Browse data with Prisma Studio |
+
+## Security
+
+- **Sessions**: opaque 256-bit tokens stored only as SHA-256 hashes; HTTP-only,
+  `SameSite=Lax`, `Secure` and `__Host-` prefixed when served over HTTPS. Idle
+  timeout (`SESSION_IDLE_MINUTES`, default 8h) and 14-day absolute expiry, with a
+  cap on concurrent sessions per user. Sessions are listed and individually
+  revocable from the profile page, and all others are revoked on password change.
+- **Passwords**: scrypt with per-password salts and timing-safe comparison. A
+  strength policy enforces length, character variety and blocks common or
+  personal values, applied at signup and on change.
+- **Brute-force protection**: per-IP and per-account rate limits on sign-in and
+  sign-up, plus progressive account lockout (`MAX_LOGIN_ATTEMPTS`,
+  `LOCKOUT_MINUTES`). Unknown emails still run a dummy hash so timing does not
+  reveal account existence.
+- **CSRF / request hygiene**: state-changing API routes verify same-origin and
+  require `application/json`, with a request body size cap. SameSite cookies add
+  a second layer.
+- **Input validation & sanitization**: every API body, query string, route
+  parameter and server-action form field is validated with Zod (`src/lib/
+  validation/schemas.ts`). Free text is length-bounded and stripped of control
+  characters; structured fields have HTML tags removed; JSON bodies reject
+  prototype-pollution keys (`__proto__`/`constructor`/`prototype`); route
+  parameters are UUID-checked before touching the database. React escapes all
+  rendered output, with `escapeHtml`/`stripTags` helpers available for any raw
+  HTML boundary.
+- **Transport & headers**: CSP, HSTS, `X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`,
+  `Cross-Origin-Resource-Policy`, `X-Permitted-Cross-Domain-Policies` and
+  `Origin-Agent-Cluster` on every response; API responses are `no-store` and
+  carry an `x-request-id`.
+- **Audit trail**: authentication events (login success/failure/lockout, logout,
+  registration, password changes, session revocations) are recorded with
+  pseudonymised IP and user-agent (HMAC via `APP_SECRET`).
+- **Tenant isolation**: every organization-owned query includes `organizationId`;
+  internal notes are filtered server-side; UI hiding is never authorization.
+- **Defense in depth**: middleware bounces unauthenticated traffic from `/app`
+  and `/portal`, while server layouts and route handlers re-check authorization.
+
+Generate the production secret with:
 
 ```bash
-cp .env.example .env
-# Add your provider key to .env, or leave it blank to use the deterministic demo fallback.
-set -a; . ./.env; set +a; node server.js
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Open <http://localhost:3000>. The fallback is useful for showing the full flow without an API key; for production-quality responses set `LLM_API_KEY`.
+Run `npm run security:audit` to check dependencies for known vulnerabilities.
 
-Supported environment variables:
+## Roadmap
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `LLM_API_KEY` | — | Server-side API key; never sent to the browser |
-| `LLM_MODEL` | `gpt-4o-mini` | Model name at the compatible provider |
-| `LLM_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API base URL |
-
-Run the syntax check:
-
-```bash
-npm run check
-```
-
-## Deploy to Vercel
-
-1. Create a public GitHub repository and push this folder.
-2. Import the repository at <https://vercel.com/new>.
-3. Add `LLM_API_KEY`, and optionally `LLM_MODEL` / `LLM_BASE_URL`, under Project Settings → Environment Variables.
-4. Deploy. Vercel serves `public/` and runs `api/teach.js` as a serverless function.
-
-The live URL is generated by Vercel after deployment. This repository is intentionally provider-agnostic, so an OpenRouter, Together, or self-hosted OpenAI-compatible base URL can be used without exposing credentials client-side.
-
-## Two-minute demo path
-
-1. Open the landing screen and select the **Photosynthesis** seed.
-2. Start teaching as **Age 10**.
-3. Send the seeded explanation, then add a second message with a concrete example.
-4. Point out how the student asks only one question and how the confusion meter changes.
-5. End the session to show the clarity report.
-6. Return home and open **History** to show the local session was saved.
-
-## Screenshots
-
-The responsive landing, teaching, and report screens are available immediately after running the app. To add repository screenshots for a public launch, capture `/` and the report view after deployment and place them in `docs/screenshots/`.
-
-## Privacy note
-
-Session history stays in the browser's `localStorage`. Explanations are sent to the configured LLM provider through `/api/teach`; the API key is read only by the server function.
+Live chat/realtime, email channels and threading, SLA timers and business-hours
+calendars, saved replies/macros, integrations/webhooks, billing and payments,
+notifications, and platform admin tenant lifecycle actions.
